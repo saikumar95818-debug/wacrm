@@ -1,5 +1,5 @@
 -- ============================================================
--- 017_account_sharing.sql — Multi-user accounts (foundation)
+-- 017_account_sharing.sql â€” Multi-user accounts (foundation)
 --
 -- Turns wacrm from single-tenant-per-user into multi-tenant-per-
 -- account. Every existing user becomes the sole `owner` of a
@@ -21,7 +21,7 @@
 --      agents+ may write to operational data; admins+ may write to
 --      settings-class tables.
 --   6. Swaps `whatsapp_config.UNIQUE(user_id)` for
---      `UNIQUE(account_id)` — one WhatsApp number per account.
+--      `UNIQUE(account_id)` â€” one WhatsApp number per account.
 --   7. Swaps the `flow_runs` "one active run per (user_id, contact)"
 --      unique index for `(account_id, contact_id)`.
 --   8. Replaces `handle_new_user` so new signups receive a freshly-
@@ -30,16 +30,16 @@
 -- What this migration does NOT touch
 --   - `profiles.role TEXT` (legacy, unused) stays. Flag for removal
 --     in a later cleanup.
---   - The `user_id` columns on domain tables stay too — they still
+--   - The `user_id` columns on domain tables stay too â€” they still
 --     identify "the agent who owns this row" (assignment, audit).
 --     They are *no longer* used for tenancy isolation.
 --   - Storage buckets (avatars, flow-media) stay user-scoped. A
 --     later migration will rescope flow-media to account paths.
---   - No user-facing UI changes — those are gated separately on
+--   - No user-facing UI changes â€” those are gated separately on
 --     `profiles.beta_features` containing 'account_sharing' in the
 --     follow-up PRs.
 --
--- Idempotent — safe to run multiple times. New columns use
+-- Idempotent â€” safe to run multiple times. New columns use
 -- IF NOT EXISTS; policies / triggers / indexes are dropped before
 -- recreate (Postgres has no CREATE POLICY IF NOT EXISTS).
 -- ============================================================
@@ -58,7 +58,7 @@ END $$;
 -- ACCOUNTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS accounts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   name TEXT NOT NULL,
   -- owner_user_id is denormalised for fast "is this user the owner of
   -- their account" reads and for the one-account-per-user invariant
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- One account per user (the locked design decision — single
+-- One account per user (the locked design decision â€” single
 -- membership). Drops automatically if we ever relax to many-to-many.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_one_per_owner
   ON accounts(owner_user_id);
@@ -88,7 +88,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON accounts
 -- once by the POST endpoint at creation time and never persisted.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS account_invitations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   role account_role_enum NOT NULL CHECK (role <> 'owner'),
@@ -169,7 +169,7 @@ GRANT EXECUTE ON FUNCTION is_account_member(UUID, account_role_enum) TO authenti
 -- ============================================================
 -- ADD account_id TO EVERY PARENT TENANT TABLE
 --
--- Nullable for now — backfill runs below, then NOT NULL applied at
+-- Nullable for now â€” backfill runs below, then NOT NULL applied at
 -- the end. Indexes too: every "list mine" query becomes "list my
 -- account's", so account_id is the new hot lookup key.
 -- ============================================================
@@ -219,9 +219,9 @@ BEGIN
   -- 001) inserted the profile inside an `EXCEPTION WHEN OTHERS ...
   -- RAISE WARNING; RETURN NEW` block, so a signup could leave an
   -- auth.users row with no matching profiles row. Those orphans would
-  -- be skipped by step (1) below, get no account, and — if they own
+  -- be skipped by step (1) below, get no account, and â€” if they own
   -- any domain rows (pre-017 RLS only required auth.uid() = user_id,
-  -- not a profile) — leave account_id NULL and abort the SET NOT NULL
+  -- not a profile) â€” leave account_id NULL and abort the SET NOT NULL
   -- step. Backfilling the missing profile first keys the whole backfill
   -- off auth.users instead of profiles, so every authenticated user is
   -- migrated and no domain row can be left without an account.
@@ -255,7 +255,7 @@ BEGIN
     AND p.account_id IS NULL;
 
   -- (3) Propagate account_id to every domain table. Uses the row's
-  -- existing user_id → profiles.user_id → profiles.account_id chain.
+  -- existing user_id â†’ profiles.user_id â†’ profiles.account_id chain.
   -- Only updates rows where account_id IS NULL so a re-run is cheap.
   FOREACH v_table IN ARRAY v_tables LOOP
     EXECUTE format($f$
@@ -268,7 +268,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- (4) NOT NULL — split out from the DO block so DDL changes happen
+-- (4) NOT NULL â€” split out from the DO block so DDL changes happen
 -- at the top transactional level. Idempotent: NOT NULL on an
 -- already-NOT NULL column is a no-op error-free.
 ALTER TABLE profiles                       ALTER COLUMN account_id   SET NOT NULL;
@@ -290,7 +290,7 @@ ALTER TABLE flows                          ALTER COLUMN account_id   SET NOT NUL
 ALTER TABLE flow_runs                      ALTER COLUMN account_id   SET NOT NULL;
 
 -- ============================================================
--- INDEXES ON account_id (every parent — these are the new hot keys)
+-- INDEXES ON account_id (every parent â€” these are the new hot keys)
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_contacts_account                ON contacts(account_id);
 CREATE INDEX IF NOT EXISTS idx_tags_account                    ON tags(account_id);
@@ -331,7 +331,7 @@ END $$;
 -- flow_runs: idempotency key swaps to (account_id, contact_id)
 --
 -- The "at most one active run per contact" invariant is per-account
--- now — two accounts that happen to share a contact phone number
+-- now â€” two accounts that happen to share a contact phone number
 -- must be able to run their own flows independently.
 -- ============================================================
 DROP INDEX IF EXISTS idx_one_active_run_per_contact;
@@ -340,7 +340,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_run_per_contact
   WHERE status = 'active';
 
 -- ============================================================
--- RLS REWRITE — PARENT TABLES
+-- RLS REWRITE â€” PARENT TABLES
 --
 -- Replaces every `auth.uid() = user_id` policy with the membership
 -- check. Three policy tiers:
@@ -353,8 +353,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_run_per_contact
 -- ============================================================
 
 -- Make the RLS rewrite re-runnable. CREATE POLICY has no IF NOT EXISTS
--- form, and the DROP statements below only name the *legacy* policies —
--- the new ones (contacts_select, …) would error with 42710 "policy
+-- form, and the DROP statements below only name the *legacy* policies â€”
+-- the new ones (contacts_select, â€¦) would error with 42710 "policy
 -- already exists" on a second run. 017 owns every policy on these tables
 -- (no later migration adds others), so drop them all first, then the
 -- CREATEs below re-establish the full set.
@@ -480,7 +480,7 @@ CREATE POLICY flow_runs_select ON flow_runs FOR SELECT USING (is_account_member(
 -- Service-role driven; no client INSERT/UPDATE/DELETE.
 
 -- ============================================================
--- RLS REWRITE — CHILD TABLES (parent-join semantics)
+-- RLS REWRITE â€” CHILD TABLES (parent-join semantics)
 -- ============================================================
 
 -- ---- contact_tags ----------------------------------------------
@@ -598,11 +598,11 @@ CREATE POLICY message_reactions_modify ON message_reactions FOR ALL USING (
 );
 
 -- ============================================================
--- RLS — PROFILES (revised)
+-- RLS â€” PROFILES (revised)
 --
 -- A profile row is readable by every member of its account so the
 -- Members tab can render. It is only writable by the row's own
--- user (so an admin cannot edit a teammate's name/avatar — that's
+-- user (so an admin cannot edit a teammate's name/avatar â€” that's
 -- the teammate's own settings). Role changes happen via the
 -- separate /api/account/members endpoint (admin-only, server-side).
 -- ============================================================
@@ -618,7 +618,7 @@ CREATE POLICY profiles_insert ON profiles FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- ============================================================
--- RLS — ACCOUNTS & ACCOUNT_INVITATIONS
+-- RLS â€” ACCOUNTS & ACCOUNT_INVITATIONS
 --
 -- accounts: members read; admins+ update; nobody inserts via
 -- client (the signup trigger / redeem RPC own creation).
@@ -643,7 +643,7 @@ CREATE POLICY account_invitations_modify ON account_invitations FOR ALL
   WITH CHECK (is_account_member(account_id, 'admin'));
 
 -- ============================================================
--- SIGNUP TRIGGER — replace to also create a personal account
+-- SIGNUP TRIGGER â€” replace to also create a personal account
 --
 -- Every new auth.users row now produces:
 --   - a fresh `accounts` row owned by them
@@ -687,3 +687,4 @@ ALTER FUNCTION public.handle_new_user() OWNER TO postgres;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+

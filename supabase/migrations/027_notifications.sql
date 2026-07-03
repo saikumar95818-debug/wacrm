@@ -2,9 +2,9 @@
 -- NOTIFICATIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  -- Recipient — the agent this notification is for.
+  -- Recipient â€” the agent this notification is for.
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   type TEXT NOT NULL DEFAULT 'conversation_assigned'
     CHECK (type IN ('conversation_assigned')),
@@ -33,7 +33,7 @@ ALTER TABLE notifications REPLICA IDENTITY FULL;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Recipients can read and mark their own notifications as read.
--- No client INSERT/DELETE policy — rows are created exclusively by
+-- No client INSERT/DELETE policy â€” rows are created exclusively by
 -- the SECURITY DEFINER trigger function below.
 DROP POLICY IF EXISTS notifications_select ON notifications;
 DROP POLICY IF EXISTS notifications_update ON notifications;
@@ -51,7 +51,7 @@ REVOKE UPDATE ON notifications FROM authenticated;
 GRANT UPDATE (read_at) ON notifications TO authenticated;
 
 -- ============================================================
--- TRIGGER — notify on conversation assignment
+-- TRIGGER â€” notify on conversation assignment
 -- ============================================================
 CREATE OR REPLACE FUNCTION notify_conversation_assigned()
 RETURNS TRIGGER
@@ -74,7 +74,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- Skip self-assignment — nothing to notify the agent about.
+  -- Skip self-assignment â€” nothing to notify the agent about.
   IF auth.uid() IS NOT NULL AND auth.uid() = NEW.assigned_agent_id THEN
     RETURN NEW;
   END IF;
@@ -129,3 +129,4 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
   END IF;
 END $$;
+
