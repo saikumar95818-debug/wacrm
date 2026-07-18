@@ -274,8 +274,13 @@ export async function POST() {
   updated_at: new Date().toISOString(),
 }
 
-      const { data: existing, error: lookupErr } = await supabase
-        .from('message_templates')
+     const { data: existing, error: lookupErr } = await supabase
+  .from('message_templates')
+  .select(`
+    id,
+    header_media_url,
+    header_handle
+  `)
         .select('id')
         .eq('account_id', accountId)
         .eq('name', t.name)
