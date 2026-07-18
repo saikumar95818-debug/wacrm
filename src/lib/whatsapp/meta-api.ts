@@ -556,6 +556,9 @@ export async function submitMessageTemplate(
 ): Promise<SubmitMessageTemplateResult> {
   const { wabaId, accessToken, payload } = args
   const url = `${META_API_BASE}/${wabaId}/message_templates`
+  console.log("========== META TEMPLATE PAYLOAD ==========")
+console.log(JSON.stringify(payload, null, 2))
+console.log("===========================================")
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -564,6 +567,11 @@ export async function submitMessageTemplate(
     },
     body: JSON.stringify(payload),
   })
+const responseText = await response.text()
+
+console.log("========== META RESPONSE ==========")
+console.log(responseText)
+console.log("===================================")
   if (!response.ok) {
     await throwMetaError(response, `Meta API error: ${response.status}`)
   }
