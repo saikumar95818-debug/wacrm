@@ -237,22 +237,42 @@ export async function POST() {
         // route. account_id is NOT NULL on message_templates
         // post-017, so an INSERT without it errors.
         account_id: accountId,
-        user_id: user.id,
-        name: t.name,
-        category: normalizeCategory(t.category),
-        language: t.language,
-        header_type: headerType,
-        header_content: header?.text ?? null,
-        header_handle: header?.example?.header_handle?.[0] ?? null,
-        body_text: body?.text ?? '',
-        footer_text: footer?.text ?? null,
-        buttons: parsedButtons.length ? parsedButtons : null,
-        sample_values: sampleValues,
-        status: normalizeStatus(t.status),
-        meta_template_id: t.id,
-        quality_score: normalizeQualityScore(t.quality_score),
-        updated_at: new Date().toISOString(),
-      }
+  user_id: user.id,
+
+  name: t.name,
+  language: t.language,
+  category: normalizeCategory(t.category),
+
+  meta_template_id: t.id,
+
+  status: normalizeStatus(t.status),
+
+  quality_score: normalizeQualityScore(t.quality_score),
+
+  header_type: headerType,
+
+  header_content: header?.text ?? null,
+
+  // Meta Resumable Upload Handle
+  header_handle:
+    header?.example?.header_handle?.[0] ?? null,
+
+  // NEW
+  header_media_url: null,
+
+  body_text: body?.text ?? '',
+
+  footer_text: footer?.text ?? null,
+
+  buttons:
+    parsedButtons.length > 0
+      ? parsedButtons
+      : [],
+
+  sample_values,
+
+  updated_at: new Date().toISOString(),
+}
 
       const { data: existing, error: lookupErr } = await supabase
         .from('message_templates')
