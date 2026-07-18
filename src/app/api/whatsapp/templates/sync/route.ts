@@ -269,7 +269,7 @@ export async function POST() {
       ? parsedButtons
       : [],
 
-  sample_values,
+  sample_values: sampleValues,
 
   updated_at: new Date().toISOString(),
 }
