@@ -259,7 +259,7 @@ header_handle:
 
 // NEW
 header_media_url: null,
-  null,
+
 
   body_text: body?.text ?? '',
 
