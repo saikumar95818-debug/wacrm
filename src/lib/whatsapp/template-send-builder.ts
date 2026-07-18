@@ -116,7 +116,17 @@ const id =
       `${headerType} header requires a media link or id at send time — set header_media_url on the template or pass headerMediaUrl/headerMediaId.`,
     );
   }
-  const mediaPayload: { link?: string; id?: string } = id ? { id } : { link };
+  let mediaPayload: { link?: string; id?: string };
+
+if (id) {
+  mediaPayload = { id };
+} else if (link) {
+  mediaPayload = { link };
+} else {
+  throw new Error(
+    `${headerType} header requires a media link or media id.`,
+  );
+}
   return {
     type: 'header',
     parameters: [
