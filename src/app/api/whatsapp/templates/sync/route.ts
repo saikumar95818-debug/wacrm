@@ -253,12 +253,15 @@ export async function POST() {
 
   header_content: header?.text ?? null,
 
-  // Meta Resumable Upload Handle
-  header_handle:
-    header?.example?.header_handle?.[0] ?? null,
+ // Meta Resumable Upload Handle
+header_handle:
+  header?.example?.header_handle?.[0] ??
+  existing?.header_handle ??
+  null,
 
-  // NEW
-  header_media_url: null,
+header_media_url:
+  existing?.header_media_url ??
+  null,
 
   body_text: body?.text ?? '',
 
