@@ -15,14 +15,38 @@ import type { TemplatePayload } from '@/lib/whatsapp/template-validators'
  */
 
 // Meta's image-header sample limits.
-const IMAGE_MAX_BYTES = 5 * 1024 * 1024
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png']
+const MEDIA_LIMITS = {
+  image: {
+    maxBytes: 5 * 1024 * 1024,
+    mimeTypes: ['image/jpeg', 'image/png'],
+    defaultMime: 'image/jpeg',
+    fileName: 'header.jpg',
+  },
+  video: {
+    maxBytes: 16 * 1024 * 1024,
+    mimeTypes: ['video/mp4'],
+    defaultMime: 'video/mp4',
+    fileName: 'header.mp4',
+  },
+  document: {
+    maxBytes: 100 * 1024 * 1024,
+    mimeTypes: ['application/pdf'],
+    defaultMime: 'application/pdf',
+    fileName: 'header.pdf',
+  },
+} as const
 
 export async function ensureImageHeaderHandle(
   payload: TemplatePayload,
   accessToken: string,
 ): Promise<void> {
-  if (payload.header_type !== 'image') return
+  if (
+  payload.header_type !== 'image' &&
+  payload.header_type !== 'video' &&
+  payload.header_type !== 'document'
+) {
+  return
+}
   if (payload.header_handle) return // already have one
   if (!payload.header_media_url) return // validator already requires url-or-handle
 
@@ -44,24 +68,33 @@ export async function ensureImageHeaderHandle(
   if (!res.ok) {
     throw new Error(`Header image URL returned ${res.status}. It must be publicly reachable.`)
   }
-
+const config = MEDIA_LIMITS[payload.header_type]
   const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
-  if (contentType && !ALLOWED_IMAGE_TYPES.includes(contentType)) {
-    throw new Error(`Header image must be JPEG or PNG (got ${contentType}).`)
+  if (contentType && !config.mimeTypes.includes(contentType as never)) {
+    throw new Error(
+  `Unsupported ${payload.header_type} format (${contentType}).`
+)
   }
 
   const bytes = new Uint8Array(await res.arrayBuffer())
   if (bytes.byteLength === 0) {
     throw new Error('Header image is empty.')
   }
-  if (bytes.byteLength > IMAGE_MAX_BYTES) {
+ if (bytes.byteLength > config.maxBytes) {
     throw new Error(
       `Header image is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB — Meta's limit is 5 MB.`,
     )
   }
 
-  const mimeType = ALLOWED_IMAGE_TYPES.includes(contentType) ? contentType : 'image/jpeg'
-  const fileName = mimeType === 'image/png' ? 'header.png' : 'header.jpg'
+ const mimeType =
+  config.mimeTypes.includes(contentType as never)
+    ? contentType
+    : config.defaultMime
+
+const fileName =
+  contentType === 'image/png'
+    ? 'header.png'
+    : config.fileName
 
   const { handle } = await uploadResumableMedia({
     appId,
